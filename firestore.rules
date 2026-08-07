@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All reads/writes go through the Next.js server using the Admin SDK,
+    // which bypasses these rules. No client-side Firestore access is used,
+    // so deny everything from the client.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

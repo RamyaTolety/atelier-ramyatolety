@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper-50: #fdf9f3;
+  --color-paper-100: #f7ede0;
+  --color-paper-200: #efdfc8;
+  --color-paper-300: #e3cca8;
+
+  --color-ink-900: #2b2420;
+  --color-ink-700: #4a4038;
+  --color-ink-500: #7a6f63;
+  --color-ink-300: #a89d8f;
+
+  --color-clay-300: #eeb495;
+  --color-clay-400: #e59873;
+  --color-clay-500: #d97757;
+  --color-clay-600: #b85c3f;
+
+  --color-sage-300: #c3d1a8;
+  --color-sage-400: #a8b88a;
+  --color-sage-500: #8a9a5b;
+
+  --color-blush-300: #f4c6cf;
+  --color-blush-400: #eda3b3;
+
+  --color-gold-300: #f2d493;
+  --color-gold-400: #eec26b;
+  --color-gold-500: #e3ac3c;
+
+  --font-sans: "Nunito", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Georgia", serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper-50);
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(217, 119, 87, 0.10), transparent 40%),
+    radial-gradient(circle at 88% 18%, rgba(138, 154, 91, 0.10), transparent 38%),
+    radial-gradient(circle at 50% 100%, rgba(238, 194, 107, 0.10), transparent 45%);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--color-gold-400);
+  color: var(--color-ink-900);
+}
+
+* {
+  scrollbar-color: var(--color-clay-400) var(--color-paper-100);
+  scrollbar-width: thin;
+}
+
+.paper-card {
+  background: var(--color-paper-100);
+  border: 1px solid var(--color-paper-300);
+  box-shadow: 0 1px 0 rgba(43, 36, 32, 0.04), 0 8px 24px -12px rgba(43, 36, 32, 0.18);
+}
+
+@keyframes brush-wiggle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+.brush-wiggle {
+  animation: brush-wiggle 2.6s ease-in-out infinite;
+  transform-origin: 70% 90%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brush-wiggle {
+    animation: none;
+  }
+}
