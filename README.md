@@ -7,26 +7,24 @@ world art traditions, and writing craft: bite-sized lessons, each with a real ex
 quick check. Built for Phase 2 Project 1 of the Hult Cohort Developer Program (Ludwitt learning
 integration).
 
-The site is fully public. No account is required to browse tracks or take quizzes. Launching
-from Ludwitt establishes a session so progress is saved between visits and learning events are
-reported to the platform; browsing without one still works, it just doesn't persist.
+The site is fully public. No account is required to browse tracks or take quizzes. Signing in
+with Ludwitt establishes a session so progress is saved between visits; browsing without one
+still works, it just doesn't persist.
 
 ## Architecture
 
 - **Framework:** Next.js 16 (App Router) + TypeScript + Tailwind CSS v4
 - **Content:** `src/lib/content.ts`, a static, typed dataset of tracks and lessons. No CMS.
-- **Identity:** Ludwitt launch tokens only. `GET /launch?token=` verifies an HS256 JWT signed
-  with the app's `LUDWITT_JWT_SECRET`, then issues Atelier's own short-lived session cookie
-  (signed separately with `SESSION_SECRET`). There is no password or account system.
+- **Identity:** Ludwitt OAuth (Bring-your-own-backend tier). `GET /auth/login` redirects to
+  Ludwitt's authorize endpoint requesting only the `profile` scope (no credit scopes; this app
+  never spends a student's credits). `GET /auth/callback` verifies the CSRF `state`, exchanges
+  the returned code for a token server-to-server, reads identity from Ludwitt's userinfo
+  endpoint, then discards the Ludwitt access token and issues Atelier's own short-lived session
+  cookie (signed with `SESSION_SECRET`). There is no password or account system of Atelier's own.
 - **Data:** Firestore (via the Admin SDK, server-side only) stores per-user lesson progress at
   `users/{sub}/lessons/{trackSlug}__{lessonSlug}`. No client-side Firestore access is used, so
   `firestore.rules` denies all direct client reads and writes. If Firestore isn't configured,
   progress calls fail soft and the site keeps working without saved progress.
-- **Ludwitt integration:** `src/lib/ludwitt.ts` verifies launch tokens and posts
-  `lesson_started`, `lesson_completed`, and `quiz_submitted` events to
-  `POST /v1/apps/{app_id}/events`. Event posting also fails soft (logs a warning) if the
-  integration env vars aren't set, so local development and anonymous browsing never depend on
-  Ludwitt being reachable.
 - **Hosting:** Vercel
 
 ## Local setup
@@ -41,9 +39,9 @@ reported to the platform; browsing without one still works, it just doesn't pers
      Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com),
      enable **Firestore Database** (production mode), deploy `firestore.rules`, then generate a
      key under **Project settings, Service accounts, Generate new private key**.
-   - `LUDWITT_APP_ID`, `LUDWITT_API_KEY`, `LUDWITT_JWT_SECRET`, `LUDWITT_API_BASE_URL`: from the
-     Ludwitt developer portal after registering the app (see below). Optional for local
-     development; the site runs fine without them.
+   - `LUDWITT_CLIENT_ID`, `LUDWITT_CLIENT_SECRET`: from the Ludwitt Creator dashboard after
+     registering the app (see below). Optional for local development; the site runs fine
+     without them, sign-in just won't work until they're set.
 3. Run the dev server:
    ```bash
    npm run dev
@@ -52,22 +50,27 @@ reported to the platform; browsing without one still works, it just doesn't pers
 
 ## Registering with Ludwitt
 
-1. Deploy the app first (see Deployment below) so a real `launch_url` and `repo_url` exist.
-2. Sign in at [ludwitt.com/developers](https://www.ludwitt.com/developers) and register the app
-   with `launch_url` set to `https://<your-domain>/launch` and `repo_url` set to this repository.
-3. Store the returned `app_id`, `api_key`, and `jwt_secret` as `LUDWITT_APP_ID`,
-   `LUDWITT_API_KEY`, and `LUDWITT_JWT_SECRET` in Vercel's environment variables, not in git.
+1. Deploy the app first (see Deployment below) so a real production URL exists.
+2. Sign in at [ludwitt.com/developers](https://www.ludwitt.com/developers), go to **Creator**,
+   and register a new app on the **Bring-your-own-backend** tier with:
+   - **Redirect URI:** `https://<your-domain>/auth/callback`
+   - **Website:** `https://<your-domain>`
+3. Store the returned `client_id` and `client_secret` as `LUDWITT_CLIENT_ID` and
+   `LUDWITT_CLIENT_SECRET` in Vercel's environment variables, not in git.
 
 ## Deployment
 
 1. `vercel link` (creates `.vercel/project.json`, not committed).
-2. Add `SESSION_SECRET`, `FIREBASE_SERVICE_ACCOUNT_KEY`, and the `LUDWITT_*` variables as Vercel
-   project environment variables.
+2. Add `SESSION_SECRET`, `FIREBASE_SERVICE_ACCOUNT_KEY`, `LUDWITT_CLIENT_ID`, and
+   `LUDWITT_CLIENT_SECRET` as Vercel project environment variables.
 3. `vercel --prod`.
 
 ## Known limitations
 
-- Progress and Ludwitt event delivery both depend on optional configuration (Firestore, Ludwitt
-  keys). The core lesson content and quizzes work without either.
+- Progress persistence depends on optional configuration (Firestore). The core lesson content
+  and quizzes work without it, they just won't remember where you left off.
 - Quiz feedback for anonymous visitors is client-side only; nothing is persisted until they
-  arrive through a valid Ludwitt launch.
+  sign in with Ludwitt.
+- This app never requests credit scopes and never calls Ludwitt's AI proxy or credit-balance
+  endpoints. It has no AI feature that would spend a student's money, so it deliberately doesn't
+  wire up code paths near real payment credits that nothing in the app actually uses.

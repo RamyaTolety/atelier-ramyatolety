@@ -1,94 +1,80 @@
 import "server-only";
-import { jwtVerify } from "jose";
 
-export type LaunchClaims = {
-  sub: string;
-  email?: string;
-  app_id: string;
+const AUTHORIZE_URL = "https://pitchrise.ludwitt.com/oauth/authorize";
+const TOKEN_URL = "https://pitchrise.ludwitt.com/api/oauth/token";
+const USERINFO_URL = "https://pitchrise.ludwitt.com/api/oauth/userinfo";
+
+// Identity only: Atelier has no AI feature that spends a student's credits,
+// so we never request credits:read / credits:spend, and never touch the
+// AI proxy or balance endpoints. Least privilege for what this app actually does.
+const SCOPE = "profile";
+
+function clientId() {
+  const id = process.env.LUDWITT_CLIENT_ID;
+  if (!id) throw new Error("LUDWITT_CLIENT_ID is not set");
+  return id;
+}
+
+function clientSecret() {
+  const secret = process.env.LUDWITT_CLIENT_SECRET;
+  if (!secret) throw new Error("LUDWITT_CLIENT_SECRET is not set");
+  return secret;
+}
+
+export function buildAuthorizeUrl(redirectUri: string, state: string): string {
+  const url = new URL(AUTHORIZE_URL);
+  url.searchParams.set("client_id", clientId());
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", SCOPE);
+  url.searchParams.set("state", state);
+  return url.toString();
+}
+
+type TokenResponse = {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  token_type: string;
+  scope: string;
 };
 
-export type LudwittEventType =
-  | "lesson_started"
-  | "lesson_completed"
-  | "quiz_submitted"
-  | "session_heartbeat";
-
-function config() {
-  const appId = process.env.LUDWITT_APP_ID;
-  const apiKey = process.env.LUDWITT_API_KEY;
-  const jwtSecret = process.env.LUDWITT_JWT_SECRET;
-  const baseUrl = process.env.LUDWITT_API_BASE_URL;
-  return { appId, apiKey, jwtSecret, baseUrl };
-}
-
-export async function verifyLaunchToken(token: string): Promise<LaunchClaims> {
-  const { jwtSecret } = config();
-  if (!jwtSecret) throw new Error("LUDWITT_JWT_SECRET is not set");
-
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret), {
-    algorithms: ["HS256"],
+export async function exchangeCodeForToken(
+  code: string,
+  redirectUri: string,
+): Promise<TokenResponse> {
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId(),
+      client_secret: clientSecret(),
+    }),
   });
 
-  if (!payload.sub || !payload.app_id) {
-    throw new Error("Launch token missing required claims");
+  if (!res.ok) {
+    throw new Error(`Ludwitt token exchange failed: ${res.status} ${await res.text()}`);
   }
-
-  return {
-    sub: payload.sub as string,
-    email: payload.email as string | undefined,
-    app_id: payload.app_id as string,
-  };
+  return (await res.json()) as TokenResponse;
 }
 
-export async function postLudwittEvent(params: {
-  userId: string;
-  type: LudwittEventType;
-  metadata?: Record<string, unknown>;
-}) {
-  const { appId, apiKey, baseUrl } = config();
-  if (!appId || !apiKey || !baseUrl) {
-    console.warn("Ludwitt event skipped: integration env vars not configured", params.type);
-    return { ok: false as const, skipped: true as const };
+export type LudwittUser = {
+  sub: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+};
+
+export async function fetchUserinfo(accessToken: string): Promise<LudwittUser> {
+  const res = await fetch(USERINFO_URL, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Ludwitt userinfo failed: ${res.status} ${await res.text()}`);
   }
-
-  try {
-    const res = await fetch(`${baseUrl}/apps/${appId}/events`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        user_id: params.userId,
-        type: params.type,
-        metadata: params.metadata ?? {},
-        occurred_at: new Date().toISOString(),
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("Ludwitt event failed", res.status, await res.text());
-      return { ok: false as const, status: res.status };
-    }
-    return { ok: true as const };
-  } catch (err) {
-    console.error("Ludwitt event request errored", err);
-    return { ok: false as const, error: String(err) };
-  }
-}
-
-export async function fetchLudwittMetrics(): Promise<{ qualified_users: number } | null> {
-  const { appId, apiKey, baseUrl } = config();
-  if (!appId || !apiKey || !baseUrl) return null;
-
-  try {
-    const res = await fetch(`${baseUrl}/apps/${appId}/metrics`, {
-      headers: { authorization: `Bearer ${apiKey}` },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as { qualified_users: number };
-  } catch {
-    return null;
-  }
+  return (await res.json()) as LudwittUser;
 }

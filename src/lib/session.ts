@@ -8,7 +8,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 export type SessionPayload = {
   sub: string;
   email?: string;
-  appId: string;
+  name?: string;
 };
 
 function sessionSecret() {
@@ -44,7 +44,7 @@ export async function getSession(): Promise<SessionPayload | null> {
     return {
       sub: payload.sub as string,
       email: payload.email as string | undefined,
-      appId: payload.appId as string,
+      name: payload.name as string | undefined,
     };
   } catch {
     return null;

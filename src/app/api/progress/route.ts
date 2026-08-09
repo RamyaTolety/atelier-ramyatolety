@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getLesson } from "@/lib/content";
 import { markLessonStarted, markLessonCompleted } from "@/lib/progress";
-import { postLudwittEvent } from "@/lib/ludwitt";
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -25,11 +24,6 @@ export async function POST(req: NextRequest) {
 
   if (action === "start") {
     await markLessonStarted(session.sub, trackSlug, lessonSlug);
-    await postLudwittEvent({
-      userId: session.sub,
-      type: "lesson_started",
-      metadata: { track: trackSlug, lesson: lessonSlug },
-    });
     return NextResponse.json({ ok: true });
   }
 
@@ -40,19 +34,7 @@ export async function POST(req: NextRequest) {
     const correct =
       found.lesson.quiz.options.find((o) => o.id === quizAnswerId)?.correct === true;
 
-    await postLudwittEvent({
-      userId: session.sub,
-      type: "quiz_submitted",
-      metadata: { track: trackSlug, lesson: lessonSlug, answer: quizAnswerId, correct },
-    });
-
     await markLessonCompleted(session.sub, trackSlug, lessonSlug, quizAnswerId, correct);
-
-    await postLudwittEvent({
-      userId: session.sub,
-      type: "lesson_completed",
-      metadata: { track: trackSlug, lesson: lessonSlug },
-    });
 
     return NextResponse.json({ ok: true, correct });
   }

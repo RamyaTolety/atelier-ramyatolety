@@ -20,10 +20,10 @@ const ACCENT_CLASS: Record<string, string> = {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ launch?: string }>;
+  searchParams: Promise<{ signin?: string }>;
 }) {
   const session = await getSession();
-  const { launch } = await searchParams;
+  const { signin } = await searchParams;
 
   return (
     <div className="space-y-14">
@@ -39,34 +39,34 @@ export default async function HomePage({
           writing: {totalLessonCount()} bite-sized lessons, each with a real exercise and a quick
           check.
         </p>
-        <Link
-          href="/learn"
-          className="inline-block rounded-full bg-clay-500 px-6 py-3 text-sm font-medium text-paper-50 shadow-sm hover:bg-clay-600 transition"
-        >
-          Browse tracks
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/learn"
+            className="inline-block rounded-full bg-clay-500 px-6 py-3 text-sm font-medium text-paper-50 shadow-sm hover:bg-clay-600 transition"
+          >
+            Browse tracks
+          </Link>
+          {!session && (
+            <a
+              href="/auth/login"
+              className="inline-block rounded-full border border-clay-400 px-6 py-3 text-sm font-medium text-clay-600 hover:bg-clay-400/10 transition"
+            >
+              Sign in with Ludwitt
+            </a>
+          )}
+        </div>
 
         <div className="mx-auto max-w-md text-xs text-ink-500">
           {session ? (
             <p>Signed in through Ludwitt. Your progress is being saved as you go.</p>
-          ) : launch === "invalid" || launch === "missing" ? (
+          ) : signin === "invalid" || signin === "failed" ? (
             <p>
-              That Ludwitt link wasn&apos;t a valid session, so progress won&apos;t be saved for
-              it. You can still browse everything below; no sign in required.
+              That sign-in attempt didn&apos;t go through, so progress won&apos;t be saved yet.
+              You can still browse everything below with no sign in required, or try signing in
+              again.
             </p>
           ) : (
-            <p>
-              No sign in required to browse or take quizzes. Open this app from your{" "}
-              <a
-                className="text-clay-600 underline"
-                href="https://www.ludwitt.com/developers"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Ludwitt
-              </a>{" "}
-              dashboard if you want your progress saved between visits.
-            </p>
+            <p>No sign in required to browse or take quizzes. Sign in with Ludwitt above if you want your progress saved between visits.</p>
           )}
         </div>
       </section>
